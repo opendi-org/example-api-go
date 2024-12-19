@@ -5,161 +5,178 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"opendi.org/go-api/types"
+	"opendi.org/go-api/apiTypes"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-var placeholderData = []types.CausalDecisionModel{
-	{
-		Schema: "Placeholder",
-		Meta: types.Meta{
-			UUID:    "4dcb00d2-4467-4853-8ed4-973d208c2ef1",
-			Name:    "Test CDM for API",
-			Summary: "This is a meaningless CDM, used to populate a test dataset.",
-			Draft:   true},
-		Diagrams: []types.Diagram{
-			{
-				Meta: types.Meta{
-					UUID:  "f2ce5b78-fb8d-4f50-9129-c33a53580395",
-					Name:  "Test CDM - CDD",
-					Draft: true,
-				},
-				Elements: []types.DiagramElement{
-					{
-						Meta: types.Meta{
-							UUID: "ecc9a714-5810-4deb-8aff-f0b15b09c1c9",
-							Name: "Test Lever",
-						},
-						CausalType:  "Lever",
-						DiagramType: "Box",
-						Content: &types.DiagramContent{
-							Position:        &types.Position{X: 0, Y: 0},
-							BoundingBoxSize: &types.Size{Width: 400, Height: 200},
-						},
-					},
-					{
-						Meta: types.Meta{
-							UUID: "e13f7b7a-3417-437a-bdc6-d9fd3689f884",
-							Name: "Test Outcome"},
-						CausalType:  "Outcome",
-						DiagramType: "Box",
-						Content: &types.DiagramContent{
-							Position:        &types.Position{X: 500, Y: 0},
-							BoundingBoxSize: &types.Size{Width: 400, Height: 200},
-						},
-					},
-				},
-				Dependencies: []types.CausalDependency{
-					{
-						Meta: types.Meta{
-							UUID: "271cabe6-ac60-4c7d-ac9b-81ecff0a78c3",
-							Name: "Test Lever --> Test Outcome"},
-						Source: "ecc9a714-5810-4deb-8aff-f0b15b09c1c9",
-						Target: "e13f7b7a-3417-437a-bdc6-d9fd3689f884",
-					},
-				},
-			},
-		},
-	},
+// API wraps a GORM database object (gorm.DB).
+// This allows me to define gin endpoint functions that always have access to the API database,
+// by making them member functions. See ENDPOINT IMPLEMENTATIONS below
+type API struct {
+	database *gorm.DB
 }
 
-var modelsMap = map[string]types.RefsCausalDecisionModel{
-	"4dcb00d2-4467-4853-8ed4-973d208c2ef1": {
-		Schema: "Placeholder",
-		Meta: types.Meta{
-			UUID:    "4dcb00d2-4467-4853-8ed4-973d208c2ef1",
-			Name:    "Test CDM for API",
-			Summary: "This is a meaningless CDM, used to populate a test dataset.",
-			Draft:   true},
-		Diagrams: []types.AssetRef[types.RefsDiagram]{
-			{
-				UUID:          "f2ce5b78-fb8d-4f50-9129-c33a53580395",
-				ContainingMap: &diagramsMap,
-			},
-		},
-	},
+// Create a new API instance, with a test database file.
+// Migrate all data types so that GORM knows how to deal with them.
+func NewAPI() (*API, error) {
+	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.AutoMigrate(&apiTypes.CausalDecisionModel{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(&apiTypes.Meta{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(&apiTypes.Diagram{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(&apiTypes.DiaElement{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(&apiTypes.CausalDependency{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &API{database: db}, nil
 }
-var diagramsMap = map[string]types.RefsDiagram{
-	"f2ce5b78-fb8d-4f50-9129-c33a53580395": {
-		Meta: types.Meta{
-			UUID:  "f2ce5b78-fb8d-4f50-9129-c33a53580395",
-			Name:  "Test CDM - CDD",
-			Draft: true,
-		},
-		Elements: []types.AssetRef[types.DiagramElement]{
-			{
-				UUID:          "ecc9a714-5810-4deb-8aff-f0b15b09c1c9",
-				ContainingMap: &diagramElementsMap,
-			},
-			{
-				UUID:          "e13f7b7a-3417-437a-bdc6-d9fd3689f884",
-				ContainingMap: &diagramElementsMap,
-			},
-		},
-		Dependencies: []types.AssetRef[types.CausalDependency]{
-			{
-				UUID:          "271cabe6-ac60-4c7d-ac9b-81ecff0a78c3",
-				ContainingMap: &dependenciesMap,
-			},
-		},
-	},
-}
-var diagramElementsMap = map[string]types.DiagramElement{
-	"ecc9a714-5810-4deb-8aff-f0b15b09c1c9": {
-		Meta: types.Meta{
-			UUID: "ecc9a714-5810-4deb-8aff-f0b15b09c1c9",
-			Name: "Test Lever",
-		},
-		CausalType:  "Lever",
-		DiagramType: "Box",
-		Content: &types.DiagramContent{
-			Position:        &types.Position{X: 0, Y: 0},
-			BoundingBoxSize: &types.Size{Width: 400, Height: 200},
-		},
-	},
-	"e13f7b7a-3417-437a-bdc6-d9fd3689f884": {
-		Meta: types.Meta{
-			UUID: "e13f7b7a-3417-437a-bdc6-d9fd3689f884",
-			Name: "Test Outcome"},
-		CausalType:  "Outcome",
-		DiagramType: "Box",
-		Content: &types.DiagramContent{
-			Position:        &types.Position{X: 500, Y: 0},
-			BoundingBoxSize: &types.Size{Width: 400, Height: 200},
-		},
-	},
-}
-var dependenciesMap = map[string]types.CausalDependency{
-	"271cabe6-ac60-4c7d-ac9b-81ecff0a78c3": {
-		Meta: types.Meta{
-			UUID: "271cabe6-ac60-4c7d-ac9b-81ecff0a78c3",
-			Name: "Test Lever --> Test Outcome"},
-		Source: "ecc9a714-5810-4deb-8aff-f0b15b09c1c9",
-		Target: "e13f7b7a-3417-437a-bdc6-d9fd3689f884",
-	},
-}
-var evaluatablesMap map[string]types.Evaluatable
 
 // ENDPOINT IMPLEMENTATIONS
-func getModels(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, placeholderData)
+
+// GET /v0/models
+// Returns a list of all apiTypes.Meta objects the user has access to.
+// Currently limited to 10 results, no pagination, no sorting.
+// TODO: Pagination, sorting
+func (api *API) getModels(c *gin.Context) {
+	var foundMetas []apiTypes.Meta
+	api.database.Limit(10).Model(&apiTypes.Meta{}).Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").Distinct().Find(&foundMetas)
+
+	c.IndentedJSON(http.StatusOK, foundMetas)
 }
 
-func postModel(c *gin.Context) {
-	var newModel types.CausalDecisionModel
+// GET /v0/models/:modelId/full
+// Returns the FULL JSON object for the model with the given model ID (UUID)
+// TODO: More consideration for possible duplicate database entries with the same UUID?
+func (api *API) getModelById(c *gin.Context) {
+	id := c.Param("modelId")
+
+	var foundMeta apiTypes.Meta
+	api.database.First(&foundMeta, "uuid = ?", id)
+
+	var foundCDM apiTypes.CausalDecisionModel
+
+	api.database.Preload("Meta").Preload("Diagrams").Preload("Diagrams.Meta").Preload("Diagrams.Elements").Preload("Diagrams.Elements.Meta").Preload("Diagrams.Dependencies").Preload("Diagrams.Dependencies.Meta").First(&foundCDM, "meta_id = ?", foundMeta.ID)
+
+	c.IndentedJSON(http.StatusOK, foundCDM)
+}
+
+// GET /v0/models/:modelId
+// Returns the JSON meta object for the model with the given model ID (UUID)
+// TODO: More consideration for possible duplicate database entries with the same UUID?
+func (api *API) getModelMetaById(c *gin.Context) {
+	id := c.Param("modelId")
+
+	var foundMeta apiTypes.Meta
+	api.database.First(&foundMeta, "uuid = ?", id)
+
+	c.IndentedJSON(http.StatusOK, foundMeta)
+}
+
+// POST /v0/models
+// Add the given model object to the database
+// TODO: Better feedback for input validation errors. Consideration for attempting to POST a model with an already-stored UUID. Should use PUT instead?
+func (api *API) postModel(c *gin.Context) {
+	var newModel apiTypes.CausalDecisionModel
 
 	if err := c.BindJSON(&newModel); err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, newModel)
 	}
 
-	placeholderData = append(placeholderData, newModel)
+	api.database.Create(&newModel)
 	c.IndentedJSON(http.StatusCreated, newModel)
 }
 
+// Main function.
+// Set up API object.
+// (Temporary) seed the database with a placeholder CDM object.
+// Gin: Define endpoint paths for functions implemented above.
+// Finally, set up a test API instance on localhost:8080.
 func main() {
-	router := gin.Default()
-	router.GET("/v0/models", getModels)
 
-	router.POST("/v0/models", postModel)
+	api, err := NewAPI()
+	if err != nil {
+		panic(err)
+	}
+
+	newData := apiTypes.CausalDecisionModel{
+		Schema: "Placeholder",
+		Meta: apiTypes.Meta{
+			UUID:    "18c731e4-6215-4908-b094-7be07ef17c98",
+			Name:    "Test CDM Meta",
+			Summary: "This is testing how GORM works with complicated data types",
+		},
+		Diagrams: []apiTypes.Diagram{
+			{
+				Meta: apiTypes.Meta{
+					UUID:    "5fcacd4f-d14e-45bf-b1f4-65cf9498f642",
+					Name:    "Test CDM Diagram",
+					Summary: "This tests diagram data for the test CDM",
+				},
+				Elements: []apiTypes.DiaElement{
+					{
+						Meta: apiTypes.Meta{
+							UUID: "ca843ab9-3058-4e9d-8633-18812c6a955b",
+							Name: "Test Lever",
+						},
+						CausalType:  "Lever",
+						DiagramType: "Box",
+						Content:     []byte(`{"position": {"x": 0, "y": 0}, "boundingBoxSize": {"width": 400, "height": 200}}`),
+					},
+					{
+						Meta: apiTypes.Meta{
+							UUID: "3bf61246-1473-4e70-beca-9d60275aaeb7",
+							Name: "Test Outcome",
+						},
+						CausalType:  "Outcome",
+						DiagramType: "Box",
+						Content:     []byte(`{"position": {"x": 500, "y": 0}, "boundingBoxSize": {"width": 400, "height": 200}}`),
+					},
+				},
+				Dependencies: []apiTypes.CausalDependency{
+					{
+						Meta: apiTypes.Meta{
+							UUID: "edfb963b-2031-426f-b8ab-393800dbd8ec",
+							Name: "Test Lever --> Test Outcome",
+						},
+						Source: "ca843ab9-3058-4e9d-8633-18812c6a955b",
+						Target: "3bf61246-1473-4e70-beca-9d60275aaeb7",
+					},
+				},
+			},
+		},
+	}
+
+	api.database.Create(&newData)
+
+	router := gin.Default()
+	router.GET("/v0/models", api.getModels)
+	router.GET("/v0/models/:modelId/full", api.getModelById)
+	router.GET("/v0/models/:modelId", api.getModelMetaById)
+
+	router.POST("/v0/models", api.postModel)
 
 	router.Run("localhost:8080")
 }
+
+//---
+// Partially based on this go.dev tutorial: https://go.dev/doc/tutorial/web-service-gin
+//---
