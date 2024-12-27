@@ -86,9 +86,14 @@ func (api *API) getModelMetaById(c *gin.Context) {
 	id := c.Param("modelId")
 
 	var foundMeta apiTypes.Meta
-	api.database.First(&foundMeta, "uuid = ?", id)
+	//This JOIN statement ensures we only search for Meta objects that represent CDMs.
+	api.database.Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").First(&foundMeta, "uuid = ?", id)
 
-	c.IndentedJSON(http.StatusOK, foundMeta)
+	if foundMeta.UUID != "" {
+		c.IndentedJSON(http.StatusOK, foundMeta)
+	} else {
+		c.IndentedJSON(http.StatusNotFound, nil)
+	}
 }
 
 // POST /v0/models
@@ -101,8 +106,22 @@ func (api *API) postModel(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, newModel)
 	}
 
-	api.database.Create(&newModel)
-	c.IndentedJSON(http.StatusCreated, newModel)
+	if exists := api.checkModelExists(newModel.Meta.UUID); !exists {
+		api.database.Create(&newModel)
+		c.IndentedJSON(http.StatusCreated, newModel)
+	} else {
+		c.IndentedJSON(http.StatusBadRequest, nil)
+	}
+}
+
+// Query database for a model Meta object with UUID == modelId
+// Returns true if a matching entry is found
+func (api *API) checkModelExists(modelId string) bool {
+	var foundMeta apiTypes.Meta
+	//This JOIN statement ensures we only search for Meta objects that represent CDMs.
+	api.database.Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").First(&foundMeta, "uuid = ?", modelId)
+
+	return foundMeta.UUID == modelId
 }
 
 // Main function.
@@ -165,7 +184,9 @@ func main() {
 		},
 	}
 
-	api.database.Create(&newData)
+	if !api.checkModelExists(newData.Meta.UUID) {
+		api.database.Create(&newData)
+	}
 
 	router := gin.Default()
 	router.GET("/v0/models", api.getModels)
