@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -69,12 +70,11 @@ func (api *API) getModels(c *gin.Context) {
 func (api *API) getModelById(c *gin.Context) {
 	id := c.Param("modelId")
 
-	var foundMeta apiTypes.Meta
-	api.database.First(&foundMeta, "uuid = ?", id)
+	foundCDM, err := api.retrieveFullModel(id)
 
-	var foundCDM apiTypes.CausalDecisionModel
-
-	api.database.Preload("Meta").Preload("Diagrams").Preload("Diagrams.Meta").Preload("Diagrams.Elements").Preload("Diagrams.Elements.Meta").Preload("Diagrams.Dependencies").Preload("Diagrams.Dependencies.Meta").First(&foundCDM, "meta_id = ?", foundMeta.ID)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, err.Error)
+	}
 
 	c.IndentedJSON(http.StatusOK, foundCDM)
 }
@@ -114,6 +114,30 @@ func (api *API) postModel(c *gin.Context) {
 	}
 }
 
+func (api *API) putModel(c *gin.Context) {
+	var updatedModel apiTypes.CausalDecisionModel
+
+	if err := c.BindJSON(&updatedModel); err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, updatedModel)
+	}
+
+	currentModel, err := api.retrieveFullModel(updatedModel.Meta.UUID)
+
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, err.Error())
+	}
+
+	api.database.Session(&gorm.Session{FullSaveAssociations: true}).Model(&currentModel).Updates(&updatedModel)
+
+	retrievedUpdatedModel, err := api.retrieveFullModel(updatedModel.Meta.UUID)
+
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, "Error retrieving model after update")
+	}
+
+	c.IndentedJSON(http.StatusOK, retrievedUpdatedModel)
+}
+
 // Query database for a model Meta object with UUID == modelId
 // Returns true if a matching entry is found
 func (api *API) checkModelExists(modelId string) bool {
@@ -122,6 +146,23 @@ func (api *API) checkModelExists(modelId string) bool {
 	api.database.Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").First(&foundMeta, "uuid = ?", modelId)
 
 	return foundMeta.UUID == modelId
+}
+
+// Query database for a full CausalDecisionModel object with Meta.UUID == modelId
+// Returns the complete model if a matching entry is found
+func (api *API) retrieveFullModel(modelId string) (apiTypes.CausalDecisionModel, error) {
+	if api.checkModelExists(modelId) {
+		var modelMeta apiTypes.Meta
+		api.database.First(&modelMeta, "uuid = ?", modelId)
+
+		var model apiTypes.CausalDecisionModel
+		api.database.Preload("Meta").Preload("Diagrams").Preload("Diagrams.Meta").Preload("Diagrams.Elements").Preload("Diagrams.Elements.Meta").Preload("Diagrams.Dependencies").Preload("Diagrams.Dependencies.Meta").First(&model, "meta_id = ?", modelMeta.ID)
+		if model.Meta.UUID == modelId {
+			return model, nil
+		}
+	}
+
+	return apiTypes.CausalDecisionModel{}, errors.New("Model with ID " + modelId + " does not exist.")
 }
 
 // Main function.
@@ -194,6 +235,7 @@ func main() {
 	router.GET("/v0/models/:modelId", api.getModelMetaById)
 
 	router.POST("/v0/models", api.postModel)
+	router.PUT("/v0/models", api.putModel)
 
 	router.Run("localhost:8080")
 }
