@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"opendi.org/go-api/apiTypes"
@@ -22,7 +23,7 @@ type API struct {
 // Create a new API instance, with a test database file.
 // Migrate all data types so that GORM knows how to deal with them.
 func NewAPI() (*API, error) {
-	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("opendi-database.db"), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +172,6 @@ func (api *API) retrieveFullModel(modelId string) (apiTypes.CausalDecisionModel,
 // Gin: Define endpoint paths for functions implemented above.
 // Finally, set up a test API instance on localhost:8080.
 func main() {
-
 	api, err := NewAPI()
 	if err != nil {
 		panic(err)
@@ -230,6 +230,14 @@ func main() {
 	}
 
 	router := gin.Default()
+	router.SetTrustedProxies(nil)
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET", "POST", "PUT"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
+	}))
+
 	router.GET("/v0/models", api.getModels)
 	router.GET("/v0/models/:modelId/full", api.getModelById)
 	router.GET("/v0/models/:modelId", api.getModelMetaById)
@@ -237,7 +245,7 @@ func main() {
 	router.POST("/v0/models", api.postModel)
 	router.PUT("/v0/models", api.putModel)
 
-	router.Run("localhost:8080")
+	router.Run("0.0.0.0:8080")
 }
 
 //---

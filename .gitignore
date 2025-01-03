@@ -8,6 +8,9 @@
 *.so
 *.dylib
 
+# Linux binary
+opendi-api
+
 # Local SQLite database files
 *.db
 
