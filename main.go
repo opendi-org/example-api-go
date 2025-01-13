@@ -23,7 +23,7 @@ type API struct {
 // Create a new API instance, with a test database file.
 // Migrate all data types so that GORM knows how to deal with them.
 func NewAPI() (*API, error) {
-	db, err := gorm.Open(sqlite.Open("opendi-database.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("db-data/opendi-database.db"), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,21 @@ func NewAPI() (*API, error) {
 // TODO: Pagination, sorting
 func (api *API) getModels(c *gin.Context) {
 	var foundMetas []apiTypes.Meta
-	api.database.Limit(10).Model(&apiTypes.Meta{}).Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").Distinct().Find(&foundMetas)
+
+	// This query will get only the latest instance (max ID) of each Meta, grouped by shared UUID.
+	// Once joined, this ensures our next query only pulls distinct Meta objects, using the latest versions.
+	latestMetas := api.database.
+		Model(&apiTypes.Meta{}).
+		Select("MAX(id) AS id").
+		Group("uuid")
+
+	// This query seeks Meta objects that are referenced via the meta_id field of a Causal Decision Model entry.
+	// Joined with the above, the result is a list of distinct Metas for CDM objects.
+	api.database.Limit(10).
+		Model(&apiTypes.Meta{}).
+		Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").
+		Joins("JOIN (?) AS latest ON meta.id = latest.id", latestMetas).
+		Find(&foundMetas)
 
 	c.IndentedJSON(http.StatusOK, foundMetas)
 }
@@ -75,9 +89,9 @@ func (api *API) getModelById(c *gin.Context) {
 
 	if err != nil {
 		c.IndentedJSON(http.StatusNotFound, err.Error)
+	} else {
+		c.IndentedJSON(http.StatusOK, foundCDM)
 	}
-
-	c.IndentedJSON(http.StatusOK, foundCDM)
 }
 
 // GET /v0/models/:modelId
@@ -88,7 +102,9 @@ func (api *API) getModelMetaById(c *gin.Context) {
 
 	var foundMeta apiTypes.Meta
 	//This JOIN statement ensures we only search for Meta objects that represent CDMs.
-	api.database.Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").First(&foundMeta, "uuid = ?", id)
+	api.database.
+		Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").
+		First(&foundMeta, "uuid = ?", id)
 
 	if foundMeta.UUID != "" {
 		c.IndentedJSON(http.StatusOK, foundMeta)
@@ -111,32 +127,27 @@ func (api *API) postModel(c *gin.Context) {
 		api.database.Create(&newModel)
 		c.IndentedJSON(http.StatusCreated, newModel)
 	} else {
-		c.IndentedJSON(http.StatusBadRequest, nil)
+		c.IndentedJSON(http.StatusSeeOther, map[string]interface{}{"Location": "PUT /v0/models/"})
 	}
 }
 
+// PUT /v0/models
+// Updates the given model within the database
+// This just adds a new entry for the given UUID.
+// GET calls for any given UUID will retrieve the most recently updated model only.
 func (api *API) putModel(c *gin.Context) {
-	var updatedModel apiTypes.CausalDecisionModel
+	var newModel apiTypes.CausalDecisionModel
 
-	if err := c.BindJSON(&updatedModel); err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, updatedModel)
+	if err := c.BindJSON(&newModel); err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, newModel)
 	}
 
-	currentModel, err := api.retrieveFullModel(updatedModel.Meta.UUID)
-
-	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, err.Error())
+	if exists := api.checkModelExists(newModel.Meta.UUID); !exists {
+		c.IndentedJSON(http.StatusSeeOther, map[string]interface{}{"Location": "POST /v0/models/"})
+	} else {
+		api.database.Create(&newModel)
+		c.IndentedJSON(http.StatusCreated, newModel)
 	}
-
-	api.database.Session(&gorm.Session{FullSaveAssociations: true}).Model(&currentModel).Updates(&updatedModel)
-
-	retrievedUpdatedModel, err := api.retrieveFullModel(updatedModel.Meta.UUID)
-
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, "Error retrieving model after update")
-	}
-
-	c.IndentedJSON(http.StatusOK, retrievedUpdatedModel)
 }
 
 // Query database for a model Meta object with UUID == modelId
@@ -144,7 +155,9 @@ func (api *API) putModel(c *gin.Context) {
 func (api *API) checkModelExists(modelId string) bool {
 	var foundMeta apiTypes.Meta
 	//This JOIN statement ensures we only search for Meta objects that represent CDMs.
-	api.database.Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").First(&foundMeta, "uuid = ?", modelId)
+	api.database.
+		Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").
+		First(&foundMeta, "uuid = ?", modelId)
 
 	return foundMeta.UUID == modelId
 }
@@ -154,10 +167,19 @@ func (api *API) checkModelExists(modelId string) bool {
 func (api *API) retrieveFullModel(modelId string) (apiTypes.CausalDecisionModel, error) {
 	if api.checkModelExists(modelId) {
 		var modelMeta apiTypes.Meta
-		api.database.First(&modelMeta, "uuid = ?", modelId)
+		api.database.Order("created_at DESC").First(&modelMeta, "uuid = ?", modelId)
 
 		var model apiTypes.CausalDecisionModel
-		api.database.Preload("Meta").Preload("Diagrams").Preload("Diagrams.Meta").Preload("Diagrams.Elements").Preload("Diagrams.Elements.Meta").Preload("Diagrams.Dependencies").Preload("Diagrams.Dependencies.Meta").First(&model, "meta_id = ?", modelMeta.ID)
+		api.database.
+			Preload("Meta").
+			Preload("Diagrams").
+			Preload("Diagrams.Meta").
+			Preload("Diagrams.Elements").
+			Preload("Diagrams.Elements.Meta").
+			Preload("Diagrams.Dependencies").
+			Preload("Diagrams.Dependencies.Meta").
+			First(&model, "meta_id = ?", modelMeta.ID)
+
 		if model.Meta.UUID == modelId {
 			return model, nil
 		}

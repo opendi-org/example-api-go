@@ -50,6 +50,8 @@ WORKDIR /
 # Only copy the built executable
 COPY --from=build /opendi-api .
 
+VOLUME /db-data
+
 EXPOSE 8080
 
 CMD ["./opendi-api"]
