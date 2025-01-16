@@ -162,6 +162,44 @@ func (api *API) checkModelExists(modelId string) bool {
 	return foundMeta.UUID == modelId
 }
 
+// DELETE /v0/models/:modelId
+// Removes the given model from the database.
+// Currently, this will leave dangling components like Diagrams and Diagram Elements.
+// This is intended, as components may be used by other models in a future version of the API.
+func (api *API) deleteModel(c *gin.Context) {
+	id := c.Param("modelId")
+
+	// Find all instances of Meta objects that match this UUID
+	var metaIds []uint
+	api.database.
+		Model(&apiTypes.Meta{}).
+		Where("uuid = ?", id).
+		Pluck("id", &metaIds)
+
+	// Did we find at least one?
+	if len(metaIds) == 0 {
+		c.IndentedJSON(http.StatusNotFound, map[string]interface{}{"Error": "Model not found."})
+		return
+	}
+
+	// Delete the Causal Decision Model object associated with each Meta object
+	api.database.
+		Where("meta_id IN ?", metaIds).
+		Delete(&apiTypes.CausalDecisionModel{})
+
+	// Delete the Meta objects themselves
+	api.database.
+		Where("id IN ?", metaIds).
+		Delete(&apiTypes.Meta{})
+
+	// Make sure deletion was successful
+	if api.checkModelExists(id) {
+		c.IndentedJSON(http.StatusInternalServerError, map[string]interface{}{"Error": "Model failed to delete."})
+	} else {
+		c.IndentedJSON(http.StatusOK, nil)
+	}
+}
+
 // Query database for a full CausalDecisionModel object with Meta.UUID == modelId
 // Returns the complete model if a matching entry is found
 func (api *API) retrieveFullModel(modelId string) (apiTypes.CausalDecisionModel, error) {
@@ -266,6 +304,8 @@ func main() {
 
 	router.POST("/v0/models", api.postModel)
 	router.PUT("/v0/models", api.putModel)
+
+	router.DELETE("/v0/models/:modelId", api.deleteModel)
 
 	router.Run("0.0.0.0:8080")
 }
