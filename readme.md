@@ -9,7 +9,9 @@ This project is implemented as a simple [Go](https://go.dev/) API, using the [Gi
 
 ## Running the API
 
-To run the API,
+This API is mainly intended to be used as part of the [Containerized Authoring Demo](https://github.com/opendi-org/containerized-authoring-demo). See that repo for instructions on running the whole project.
+
+To run the API individually,
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) or some other form of the [Docker Engine](https://docs.docker.com/engine/install/).
 2. Download the latest image for the OpenDI Go API from DockerHub (TODO: Host image on DockerHub). If this is impossible or unavailable, see [Building the API](#building-the-api) for instructions on building your own image.
 3. Run a container from the image. See step 4 for Docker Desktop instructions, or step 5 for command line instructions.
