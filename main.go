@@ -104,7 +104,7 @@ func (api *API) getModelMetaById(c *gin.Context) {
 	//This JOIN statement ensures we only search for Meta objects that represent CDMs.
 	api.database.
 		Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").
-		First(&foundMeta, "uuid = ?", id)
+		Last(&foundMeta, "uuid = ?", id) //Last will return the latest (greatest primary key)
 
 	if foundMeta.UUID != "" {
 		c.IndentedJSON(http.StatusOK, foundMeta)
