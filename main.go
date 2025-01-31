@@ -65,6 +65,7 @@ func (api *API) getModels(c *gin.Context) {
 	// Once joined, this ensures our next query only pulls distinct Meta objects, using the latest versions.
 	latestMetas := api.database.
 		Model(&apiTypes.Meta{}).
+		Order("updated_at DESC"). //Default order for this list is update date, latest first.
 		Select("MAX(id) AS id").
 		Group("uuid")
 
@@ -258,7 +259,7 @@ func main() {
 							Name: "Test Lever",
 						},
 						CausalType:  "Lever",
-						DiagramType: "Box",
+						DiagramType: "box",
 						Content:     []byte(`{"position": {"x": 0, "y": 0}, "boundingBoxSize": {"width": 400, "height": 200}}`),
 					},
 					{
@@ -267,7 +268,7 @@ func main() {
 							Name: "Test Outcome",
 						},
 						CausalType:  "Outcome",
-						DiagramType: "Box",
+						DiagramType: "box",
 						Content:     []byte(`{"position": {"x": 500, "y": 0}, "boundingBoxSize": {"width": 400, "height": 200}}`),
 					},
 				},
