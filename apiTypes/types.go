@@ -10,16 +10,16 @@ type CausalDecisionModel struct {
 	CreatedAt time.Time `json:"-"`
 	UpdatedAt time.Time `json:"-"`
 	Schema    string    `json:"$schema"`
-	MetaID    int       `json:"-"`
+	MetaID    int       `gorm:"index;constraint:OnDelete:CASCADE;" json:"-"`
 	Meta      Meta      `json:"meta"`
-	Diagrams  []Diagram `gorm:"many2many:cdm_diagrams" json:"diagrams,omitempty"`
+	Diagrams  []Diagram `gorm:"many2many:cdm_diagrams;constraint:OnDelete:CASCADE;" json:"diagrams,omitempty"`
 }
 
 type Meta struct {
 	ID            int             `gorm:"primaryKey" json:"-"`
 	CreatedAt     time.Time       `json:"-"`
 	UpdatedAt     time.Time       `json:"-"`
-	UUID          string          `gorm:"type:uuid" json:"uuid"`
+	UUID          string          `json:"uuid"`
 	Name          string          `json:"name,omitempty"`
 	Summary       string          `json:"summary,omitempty"`
 	Documentation json.RawMessage `json:"documentation,omitempty"`
@@ -37,8 +37,8 @@ type Diagram struct {
 	UpdatedAt    time.Time          `json:"-"`
 	MetaID       int                `json:"-"`
 	Meta         Meta               `json:"meta"`
-	Elements     []DiaElement       `gorm:"many2many:diagram_elements" json:"elements,omitempty"`
-	Dependencies []CausalDependency `gorm:"many2many:diagram_dependencies" json:"dependencies,omitempty"`
+	Elements     []DiaElement       `gorm:"many2many:diagram_elements;constraint:OnDelete:CASCADE;" json:"elements,omitempty"`
+	Dependencies []CausalDependency `gorm:"many2many:diagram_dependencies;constraint:OnDelete:CASCADE;" json:"dependencies,omitempty"`
 	Addons       json.RawMessage    `json:"addons,omitempty"`
 }
 
@@ -60,6 +60,6 @@ type CausalDependency struct {
 	UpdatedAt time.Time `json:"-"`
 	MetaID    int       `json:"-"`
 	Meta      Meta      `json:"meta"`
-	Source    string    `gorm:"type:uuid" json:"source"`
-	Target    string    `gorm:"type:uuid" json:"target"`
+	Source    string    `json:"source"`
+	Target    string    `json:"target"`
 }

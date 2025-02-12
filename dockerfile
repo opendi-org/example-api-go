@@ -38,14 +38,15 @@ RUN go build -o opendi-api .
 # --CREATE THE RUNNABLE CONTAINER--
 ###############################
 
-# Using a really small starting image here.
-# If you need to debug, switch this to
-#   FROM debain:bullseye-slim
-# and run shell:
+# Using a fairly small starting image here.
+# If you need to debug, run shell:
 #   docker run -it opendi-api sh
-FROM gcr.io/distroless/base-debian11
+FROM debian:bullseye-slim
 
 WORKDIR /
+
+RUN apt-get update
+RUN apt-get install -y curl
 
 # Only copy the built executable
 COPY --from=build /opendi-api .

@@ -2,14 +2,15 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"opendi.org/go-api/apiTypes"
+	"opendi.org/go-api/db"
 
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -23,28 +24,28 @@ type API struct {
 // Create a new API instance, with a test database file.
 // Migrate all data types so that GORM knows how to deal with them.
 func NewAPI() (*API, error) {
-	db, err := gorm.Open(sqlite.Open("db-data/opendi-database.db"), &gorm.Config{})
+	db, err := db.GetDatabase()
 	if err != nil {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&apiTypes.CausalDecisionModel{})
+	err = db.AutoMigrate(apiTypes.CausalDecisionModel{})
 	if err != nil {
 		return nil, err
 	}
-	err = db.AutoMigrate(&apiTypes.Meta{})
+	err = db.AutoMigrate(apiTypes.Meta{})
 	if err != nil {
 		return nil, err
 	}
-	err = db.AutoMigrate(&apiTypes.Diagram{})
+	err = db.AutoMigrate(apiTypes.Diagram{})
 	if err != nil {
 		return nil, err
 	}
-	err = db.AutoMigrate(&apiTypes.DiaElement{})
+	err = db.AutoMigrate(apiTypes.DiaElement{})
 	if err != nil {
 		return nil, err
 	}
-	err = db.AutoMigrate(&apiTypes.CausalDependency{})
+	err = db.AutoMigrate(apiTypes.CausalDependency{})
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,6 @@ func (api *API) getModels(c *gin.Context) {
 	// Once joined, this ensures our next query only pulls distinct Meta objects, using the latest versions.
 	latestMetas := api.database.
 		Model(&apiTypes.Meta{}).
-		Order("updated_at DESC"). //Default order for this list is update date, latest first.
 		Select("MAX(id) AS id").
 		Group("uuid")
 
@@ -75,6 +75,7 @@ func (api *API) getModels(c *gin.Context) {
 		Model(&apiTypes.Meta{}).
 		Joins("JOIN causal_decision_models ON causal_decision_models.meta_id = meta.id").
 		Joins("JOIN (?) AS latest ON meta.id = latest.id", latestMetas).
+		Order("meta.updated_at DESC"). //Default order for this list is update date, latest first.
 		Find(&foundMetas)
 
 	c.IndentedJSON(http.StatusOK, foundMetas)
@@ -151,6 +152,17 @@ func (api *API) putModel(c *gin.Context) {
 	}
 }
 
+// GET /v0/health
+// Return a simple 200 OK status when the API is set up and working properly
+func (api *API) healthCheck(c *gin.Context) {
+	fmt.Println("Health check requested!")
+	if api.database != nil {
+		c.IndentedJSON(http.StatusOK, nil)
+	} else {
+		c.IndentedJSON(http.StatusInternalServerError, nil)
+	}
+}
+
 // Query database for a model Meta object with UUID == modelId
 // Returns true if a matching entry is found
 func (api *API) checkModelExists(modelId string) bool {
@@ -165,8 +177,6 @@ func (api *API) checkModelExists(modelId string) bool {
 
 // DELETE /v0/models/:modelId
 // Removes the given model from the database.
-// Currently, this will leave dangling components like Diagrams and Diagram Elements.
-// This is intended, as components may be used by other models in a future version of the API.
 func (api *API) deleteModel(c *gin.Context) {
 	id := c.Param("modelId")
 
@@ -260,7 +270,7 @@ func main() {
 						},
 						CausalType:  "Lever",
 						DiagramType: "box",
-						Content:     []byte(`{"position": {"x": 0, "y": 0}, "boundingBoxSize": {"width": 400, "height": 200}}`),
+						Content:     []byte(`{"position": {"x": 150, "y": 150}, "boundingBoxSize": {"width": 400, "height": 200}}`),
 					},
 					{
 						Meta: apiTypes.Meta{
@@ -269,7 +279,7 @@ func main() {
 						},
 						CausalType:  "Outcome",
 						DiagramType: "box",
-						Content:     []byte(`{"position": {"x": 500, "y": 0}, "boundingBoxSize": {"width": 400, "height": 200}}`),
+						Content:     []byte(`{"position": {"x": 500, "y": 150}, "boundingBoxSize": {"width": 400, "height": 200}}`),
 					},
 				},
 				Dependencies: []apiTypes.CausalDependency{
@@ -295,7 +305,7 @@ func main() {
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"GET", "POST", "PUT"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
 	}))
 
@@ -307,6 +317,8 @@ func main() {
 	router.PUT("/v0/models", api.putModel)
 
 	router.DELETE("/v0/models/:modelId", api.deleteModel)
+
+	router.GET("/v0/health", api.healthCheck)
 
 	router.Run("0.0.0.0:8080")
 }
