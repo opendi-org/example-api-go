@@ -45,6 +45,10 @@ func NewAPI() (*API, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = db.AutoMigrate(apiTypes.DiaDisplay{})
+	if err != nil {
+		return nil, err
+	}
 	err = db.AutoMigrate(apiTypes.CausalDependency{})
 	if err != nil {
 		return nil, err
@@ -227,6 +231,8 @@ func (api *API) retrieveFullModel(modelId string) (apiTypes.CausalDecisionModel,
 			Preload("Diagrams.Elements.Meta").
 			Preload("Diagrams.Dependencies").
 			Preload("Diagrams.Dependencies.Meta").
+			Preload("Diagrams.Elements.Displays").
+			Preload("Diagrams.Elements.Displays.Meta").
 			First(&model, "meta_id = ?", modelMeta.ID)
 
 		if model.Meta.UUID == modelId {
@@ -268,18 +274,26 @@ func main() {
 							UUID: "ca843ab9-3058-4e9d-8633-18812c6a955b",
 							Name: "Test Lever",
 						},
-						CausalType:  "Lever",
-						DiagramType: "box",
-						Content:     []byte(`{"position": {"x": 150, "y": 150}, "boundingBoxSize": {"width": 400, "height": 200}}`),
+						CausalType: "Lever",
+						Position:   []byte(`{"x": 100, "y": 200}`),
+						Displays: []apiTypes.DiaDisplay{
+							{
+								Meta: apiTypes.Meta{
+									UUID: "d98e3aae-4910-4282-aeb7-0272068417d2",
+									Name: "Test Display",
+								},
+								DisplayType: "controlBoolean",
+								Content:     []byte(`{"controlParameters": {"value": false, "isInteractive": false}}`),
+							},
+						},
 					},
 					{
 						Meta: apiTypes.Meta{
 							UUID: "3bf61246-1473-4e70-beca-9d60275aaeb7",
 							Name: "Test Outcome",
 						},
-						CausalType:  "Outcome",
-						DiagramType: "box",
-						Content:     []byte(`{"position": {"x": 500, "y": 150}, "boundingBoxSize": {"width": 400, "height": 200}}`),
+						CausalType: "Outcome",
+						Position:   []byte(`{"x": 100, "y": 500}`),
 					},
 				},
 				Dependencies: []apiTypes.CausalDependency{
