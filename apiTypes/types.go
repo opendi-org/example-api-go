@@ -43,24 +43,15 @@ type Diagram struct {
 }
 
 type DiaElement struct {
-	ID         int             `gorm:"primaryKey" json:"-"`
-	CreatedAt  time.Time       `json:"-"`
-	UpdatedAt  time.Time       `json:"-"`
-	MetaID     int             `json:"-"`
-	Meta       Meta            `json:"meta"`
-	CausalType string          `json:"causalType"`
-	Position   json.RawMessage `json:"position"`
-	Displays   []DiaDisplay    `gorm:"many2many:diagram_displays;constraint:OnDelete:CASCADE;" json:"displays,omitempty"`
-}
-
-type DiaDisplay struct {
-	ID          int             `gorm:"primaryKey" json:"-"`
-	CreatedAt   time.Time       `json:"-"`
-	UpdatedAt   time.Time       `json:"-"`
-	MetaID      int             `json:"-"`
-	Meta        Meta            `json:"meta"`
-	Content     json.RawMessage `json:"content"`
-	DisplayType string          `json:"displayType"`
+	ID                 int             `gorm:"primaryKey" json:"-"`
+	CreatedAt          time.Time       `json:"-"`
+	UpdatedAt          time.Time       `json:"-"`
+	MetaID             int             `json:"-"`
+	Meta               Meta            `json:"meta"`
+	CausalType         string          `json:"causalType"`
+	DiagramType        string          `json:"diaType"`
+	Content            json.RawMessage `json:"content"`
+	AssociatedElements json.RawMessage `json:"associatedEvalElements,omitempty"`
 }
 
 type CausalDependency struct {
