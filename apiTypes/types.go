@@ -19,11 +19,11 @@ type CausalDecisionModel struct {
 	Schema         string             `json:"$schema"`
 	MetaID         int                `gorm:"index;constraint:OnDelete:CASCADE;" json:"-"`
 	Meta           Meta               `json:"meta"`
+	RunnableModels []RunnableModel    `gorm:"many2many:cdm_runnableModels;constraint:OnDelete:CASCADE;" json:"runnableModels,omitempty"`
 	Diagrams       []Diagram          `gorm:"many2many:cdm_diagrams;constraint:OnDelete:CASCADE;" json:"diagrams,omitempty"`
+	EvalAssets     []EvalAsset        `gorm:"many2many:cdm_evaluatableAssets;constraint:OnDelete:CASCADE;" json:"evaluatableAssets,omitempty"`
 	IOValues       []InputOutputValue `gorm:"many2many:cdm_inputOutputValues;constraint:OnDelete:CASCADE;" json:"inputOutputValues,omitempty"`
 	Controls       []Control          `gorm:"many2many:cdm_controls;constraint:OnDelete:CASCADE;" json:"controls,omitempty"`
-	RunnableModels []RunnableModel    `gorm:"many2many:cdm_runnableModels;constraint:OnDelete:CASCADE;" json:"runnableModels,omitempty"`
-	EvalAssets     []EvalAsset        `gorm:"many2many:cdm_evaluatableAssets;constraint:OnDelete:CASCADE;" json:"evaluatableAssets,omitempty"`
 	Addons         json.RawMessage    `json:"addons,omitempty"`
 }
 
@@ -72,8 +72,9 @@ type DiaDisplay struct {
 	UpdatedAt   time.Time       `json:"-"`
 	MetaID      int             `json:"-"`
 	Meta        Meta            `json:"meta"`
-	Content     json.RawMessage `json:"content"`
 	DisplayType string          `json:"displayType"`
+	Content     json.RawMessage `json:"content"`
+	Addons      json.RawMessage `json:"addons,omitempty"`
 }
 
 type CausalDependency struct {
@@ -133,8 +134,9 @@ type EvalElement struct {
 	Meta         Meta            `json:"meta"`
 	Inputs       json.RawMessage `json:"inputs"`
 	Outputs      json.RawMessage `json:"outputs"`
-	FunctionName string          `json:"functionName"`
-	EvasAssetID  int             `json:"-"`
+	FunctionName string          `json:"functionName,omitempty"`
+	APICacheSize int             `json:"apiCacheSize,omitempty"`
+	EvalAssetID  int             `json:"-"`
 	EvalAsset    string          `json:"evaluatableAsset"`
 	Addons       json.RawMessage `json:"addons,omitempty"`
 }
