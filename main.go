@@ -1,3 +1,7 @@
+/**
+ * Define and implement API endpoints for transmitting CDMs to/from a database
+ */
+
 package main
 
 import (
@@ -46,6 +50,26 @@ func NewAPI() (*API, error) {
 		return nil, err
 	}
 	err = db.AutoMigrate(apiTypes.CausalDependency{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(apiTypes.InputOutputValue{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(apiTypes.Control{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(apiTypes.EvalAsset{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(apiTypes.RunnableModel{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(apiTypes.EvalElement{})
 	if err != nil {
 		return nil, err
 	}
@@ -227,6 +251,18 @@ func (api *API) retrieveFullModel(modelId string) (apiTypes.CausalDecisionModel,
 			Preload("Diagrams.Elements.Meta").
 			Preload("Diagrams.Dependencies").
 			Preload("Diagrams.Dependencies.Meta").
+			Preload("Diagrams.Elements.Displays").
+			Preload("Diagrams.Elements.Displays.Meta").
+			Preload("IOValues").
+			Preload("IOValues.Meta").
+			Preload("Controls").
+			Preload("Controls.Meta").
+			Preload("RunnableModels").
+			Preload("RunnableModels.Meta").
+			Preload("RunnableModels.Elements").
+			Preload("RunnableModels.Elements.Meta").
+			Preload("EvalAssets").
+			Preload("EvalAssets.Meta").
 			First(&model, "meta_id = ?", modelMeta.ID)
 
 		if model.Meta.UUID == modelId {
@@ -239,7 +275,7 @@ func (api *API) retrieveFullModel(modelId string) (apiTypes.CausalDecisionModel,
 
 // Main function.
 // Set up API object.
-// (Temporary) seed the database with a placeholder CDM object.
+// (Dev build only) seed the database with a test model object.
 // Gin: Define endpoint paths for functions implemented above.
 // Finally, set up a test API instance on localhost:8080.
 func main() {
@@ -248,56 +284,12 @@ func main() {
 		panic(err)
 	}
 
-	newData := apiTypes.CausalDecisionModel{
-		Schema: "Placeholder",
-		Meta: apiTypes.Meta{
-			UUID:    "18c731e4-6215-4908-b094-7be07ef17c98",
-			Name:    "Test CDM Meta",
-			Summary: "This is testing how GORM works with complicated data types",
-		},
-		Diagrams: []apiTypes.Diagram{
-			{
-				Meta: apiTypes.Meta{
-					UUID:    "5fcacd4f-d14e-45bf-b1f4-65cf9498f642",
-					Name:    "Test CDM Diagram",
-					Summary: "This tests diagram data for the test CDM",
-				},
-				Elements: []apiTypes.DiaElement{
-					{
-						Meta: apiTypes.Meta{
-							UUID: "ca843ab9-3058-4e9d-8633-18812c6a955b",
-							Name: "Test Lever",
-						},
-						CausalType:  "Lever",
-						DiagramType: "box",
-						Content:     []byte(`{"position": {"x": 150, "y": 150}, "boundingBoxSize": {"width": 400, "height": 200}}`),
-					},
-					{
-						Meta: apiTypes.Meta{
-							UUID: "3bf61246-1473-4e70-beca-9d60275aaeb7",
-							Name: "Test Outcome",
-						},
-						CausalType:  "Outcome",
-						DiagramType: "box",
-						Content:     []byte(`{"position": {"x": 500, "y": 150}, "boundingBoxSize": {"width": 400, "height": 200}}`),
-					},
-				},
-				Dependencies: []apiTypes.CausalDependency{
-					{
-						Meta: apiTypes.Meta{
-							UUID: "edfb963b-2031-426f-b8ab-393800dbd8ec",
-							Name: "Test Lever --> Test Outcome",
-						},
-						Source: "ca843ab9-3058-4e9d-8633-18812c6a955b",
-						Target: "3bf61246-1473-4e70-beca-9d60275aaeb7",
-					},
-				},
-			},
-		},
-	}
-
-	if !api.checkModelExists(newData.Meta.UUID) {
-		api.database.Create(&newData)
+	//If this is a development build, seed the database with our test model
+	if db.GetEnvironmentValue("BUILD_TYPE", "prod") == "dev" {
+		testData := apiTypes.GetTestModel()
+		if !api.checkModelExists(testData.Meta.UUID) {
+			api.database.Create(&testData)
+		}
 	}
 
 	router := gin.Default()

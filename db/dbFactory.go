@@ -38,19 +38,19 @@ type DBConfig struct {
  * If environment variables are not set, they will use default values.
  */
 func GetConfig() (*DBConfig, error) {
-	portString := getEnvironmentValue("DB_PORT", "3306")
+	portString := GetEnvironmentValue("DB_PORT", "3306")
 	port, err := strconv.Atoi(portString)
 	if err != nil {
 		return nil, fmt.Errorf("invalid DB_PORT: %v", err)
 	}
 
 	return &DBConfig{
-		DBType:     getEnvironmentValue("DATABASE_TYPE", "sqlite"),
-		DBHost:     getEnvironmentValue("DB_HOST", "http://db"),
+		DBType:     GetEnvironmentValue("DATABASE_TYPE", "sqlite"),
+		DBHost:     GetEnvironmentValue("DB_HOST", "http://db"),
 		DBPort:     port,
-		DBUser:     getEnvironmentValue("DB_USER", "myuser"),
-		DBPassword: getEnvironmentValue("DB_PASSWORD", "defaultpassword"),
-		DBName:     getEnvironmentValue("DB_NAME", "modelsdb"),
+		DBUser:     GetEnvironmentValue("DB_USER", "myuser"),
+		DBPassword: GetEnvironmentValue("DB_PASSWORD", "defaultpassword"),
+		DBName:     GetEnvironmentValue("DB_NAME", "modelsdb"),
 	}, nil
 }
 
@@ -58,7 +58,7 @@ func GetConfig() (*DBConfig, error) {
  * Read an individual environment variable key. If the variable is not set,
  * use the provided default value instead.
  */
-func getEnvironmentValue(key string, defaultValue string) string {
+func GetEnvironmentValue(key string, defaultValue string) string {
 	if retrievedValue := os.Getenv(key); retrievedValue != "" {
 		return retrievedValue
 	}
