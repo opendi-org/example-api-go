@@ -49,10 +49,6 @@ func NewAPI() (*API, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.AutoMigrate(apiTypes.DiaDisplay{})
-	if err != nil {
-		return nil, err
-	}
 	err = db.AutoMigrate(apiTypes.CausalDependency{})
 	if err != nil {
 		return nil, err
